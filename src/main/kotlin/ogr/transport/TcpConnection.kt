@@ -21,7 +21,7 @@ class TcpConnection(
 
     companion object {
         private const val MIN_BYTES_TO_READ = 4L
-        private const val READ_LOOP_DELAY = 50L
+        private const val READ_LOOP_DELAY = 20L
     }
 
     init {

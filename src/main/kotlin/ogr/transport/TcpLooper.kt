@@ -26,8 +26,8 @@ class TcpLooper(
     private var isCanceled = false
 
     companion object {
-        private const val CONNECT_LOOP_DELAY = 50L
-        private val CHECK_CONNECTION_TIMEOUT = (150L).milliseconds
+        private const val CONNECT_LOOP_DELAY = 20L
+        private val CHECK_CONNECTION_TIMEOUT = (100L).milliseconds
     }
 
     init {
@@ -95,7 +95,7 @@ class TcpLooper(
             println("Connected to ${node.id}") // <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
         }
         catch (e: Exception) {
-            System.err.println("Node: ${self.id}. Can not connect to node: ${node.id}")
+            //System.err.println("Node: ${self.id}. Can not connect to node: ${node.id}")
         }
         finally {
             atomic.set(false)
