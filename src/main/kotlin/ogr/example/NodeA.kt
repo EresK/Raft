@@ -1,9 +1,8 @@
 package ogr.example
 
 import kotlinx.coroutines.runBlocking
+import ogr.raft.RaftServer
 import ogr.transport.Node
-import ogr.transport.TcpConnection
-import ogr.transport.TcpLooper
 
 fun main(): Unit = runBlocking {
     val self = Node(1, "127.0.0.1", 9001)
@@ -12,17 +11,6 @@ fun main(): Unit = runBlocking {
         Node(3, "127.0.0.1", 9003)
     )
 
-    val nodes: MutableList<TcpConnection> = mutableListOf()
-
-    val looper = TcpLooper(self, others,
-        { connection ->
-            nodes.add(connection)
-        },
-        { connection, message ->
-
-        },
-        { connection ->
-            connection.write("hello")
-        })
-    looper.start()
+    val server = RaftServer(self, others)
+    server.start()
 }
