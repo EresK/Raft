@@ -74,7 +74,7 @@ class CoroutineQueue<E> {
         }
     }
 
-    suspend fun peek(): E {
+    suspend fun peek(): E? {
         return mutex.withLock {
             queue.peek()
         }

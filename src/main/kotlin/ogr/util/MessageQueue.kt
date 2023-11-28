@@ -15,7 +15,15 @@ class MessageQueue {
 
     suspend fun poll(): ReceivedMessage? {
         val messageEntry = messageQueue.poll()
+        return getReceivedMessageOrNull(messageEntry)
+    }
 
+    suspend fun peek(): ReceivedMessage? {
+        val messageEntry = messageQueue.peek()
+        return getReceivedMessageOrNull(messageEntry)
+    }
+
+    private fun getReceivedMessageOrNull(messageEntry: MessageEntry?): ReceivedMessage? {
         return if (messageEntry != null) {
             val connection = messageEntry.connection
             val message = messageEntry.message

@@ -26,8 +26,8 @@ class TcpLooper(
     private var isCanceled = false
 
     companion object {
-        private const val CONNECT_LOOP_DELAY = 20L
-        private val CHECK_CONNECTION_TIMEOUT = (100L).milliseconds
+        private const val CONNECT_LOOP_DELAY = 300L
+        private val CHECK_CONNECTION_TIMEOUT = (1000L).milliseconds
     }
 
     init {

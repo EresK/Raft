@@ -9,7 +9,7 @@ class MessageWriter {
     private var isCanceled = false
 
     companion object {
-        private const val WRITE_LOOP_DELAY = 20L
+        private const val WRITE_LOOP_DELAY = 35L
     }
 
     suspend fun add(connection: TcpConnection, message: String) {
