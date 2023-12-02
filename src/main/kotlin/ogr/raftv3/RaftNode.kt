@@ -7,6 +7,7 @@ import ogr.rpc.*
 import ogr.transport.Node
 import ogr.transport.TcpConnection
 import ogr.transport.TcpLooper
+import ogr.util.LogEntry
 import ogr.util.MessageEntry
 import ogr.util.MessageQueue
 import ogr.util.MessageWriter
@@ -66,6 +67,25 @@ class RaftNode(val self: Node, val others: List<Node>) {
         raftServerScope.cancel()
     }
 
+    suspend fun appendCommand(command: Int): Boolean {
+        val index = state.applyCommand(LogEntry(command, state.currentTerm))
+
+        while (index > state.log.commitIndex) {
+            delay(100L)
+        }
+
+        return true
+    }
+
+    fun isLeader(): Boolean = state.isLeader()
+
+    fun state(): List<LogEntry> {
+        println("Commit index: ${state.log.commitIndex}") // <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+
+        return state.log.entries.take(state.log.commitIndex + 1)
+//        return state.log.entries
+    }
+
     private suspend fun raftLoop() {
         while (!isCanceled) {
             println("${state.status}: ${state.currentTerm}") // <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
@@ -103,8 +123,6 @@ class RaftNode(val self: Node, val others: List<Node>) {
                     val response = state.appendEntries(appendEntries)
 
                     if (response.success) {
-//                        println("- AE success") // <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
-
                         timeout = nextTimeout()
                         updateLastTime()
                     }
@@ -248,12 +266,16 @@ class RaftNode(val self: Node, val others: List<Node>) {
                 messages.clear()
 
                 for (conn in currentConnections) {
+                    val prevIndex = nextIndex[conn.other.id]!! - 1
+                    val prevTerm = if (prevIndex > -1) state.log[prevIndex]?.term!! else -1
+                    val entries = state.log.lastStartsAt(prevIndex + 1)
+
                     val appendEntries = AppendEntries(
                         term = state.currentTerm,
                         leaderId = state.self.id,
-                        prevLogIndex = nextIndex[conn.other.id]!!,
-                        prevLogTerm = state.log[nextIndex[conn.other.id]!!]?.term ?: 0,
-                        entries = state.log.entries,
+                        prevLogIndex = prevIndex,
+                        prevLogTerm = prevTerm,
+                        entries = entries,
                         leaderCommit = state.log.commitIndex
                     )
                     val appendEntriesMessage = jacksonMapper.writeValueAsString(appendEntries)
@@ -307,15 +329,33 @@ class RaftNode(val self: Node, val others: List<Node>) {
                 RpcType.AppendEntriesResponse -> {
                     val response = jacksonMapper.readValue<AppendEntriesResponse>(message)
 
+                    // Success
                     if (response.term == state.currentTerm && response.success) {
-                        nextIndex[connection.other.id] = nextIndex[connection.other.id]!! + 1
-                        // TODO: update matchIndex
+                        val nodeNextIndex = nextIndex[connection.other.id]!!
+                        val nodeMatchIndex = matchIndex[connection.other.id]!!
+
+                        if (nodeNextIndex < state.log.lastIndex()) {
+                            nextIndex[connection.other.id] = nodeNextIndex + 1
+                        }
+
+                        if (nodeMatchIndex < state.log.lastIndex()) {
+                            matchIndex[connection.other.id] = nodeMatchIndex + 1
+                        }
+
+                        // Check that log is committed
+                        if (isLogAtIndexReplicated(nodeNextIndex)) {
+                            state.log.commit(nodeNextIndex)
+                        }
                     }
+                    // Fail
                     else if (response.term == state.currentTerm) {
                         nextIndex[connection.other.id] = min(0, nextIndex[connection.other.id]!! - 1)
-                        // TODO: update matchIndex
                     }
-                    // TODO: else update term
+
+                    if (response.term > state.currentTerm) {
+                        state.becomeFollower()
+                        break@loop
+                    }
                 }
 
                 else -> {}
@@ -329,6 +369,11 @@ class RaftNode(val self: Node, val others: List<Node>) {
     }
 
     /* Supportive functions */
+    private fun isLogAtIndexReplicated(index: Int): Boolean {
+        val count = matchIndex.values.count { it >= index } + 1
+        return count >= majority
+    }
+
     private fun updateNextAndMatchIndices() {
         for (node in others) {
             nextIndex[node.id] = 0

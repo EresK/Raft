@@ -6,6 +6,7 @@ import ogr.rpc.AppendEntriesResponse
 import ogr.rpc.RequestVote
 import ogr.rpc.RequestVoteResponse
 import ogr.transport.Node
+import ogr.util.LogEntry
 import java.util.concurrent.atomic.AtomicInteger
 
 class State(val self: Node) {
@@ -24,6 +25,11 @@ class State(val self: Node) {
     var votedFor: Int? = null
         private set
     val log: Log = Log()
+
+    fun isLeader(): Boolean {
+        return if (leaderId == null) false
+        else leaderId == self.id
+    }
 
     private fun updateStatus(newStatus: RaftStatus) {
         status = newStatus
@@ -117,6 +123,10 @@ class State(val self: Node) {
         }
 
         return RequestVoteResponse(currentTerm, grantVote)
+    }
+
+    fun applyCommand(entry: LogEntry): Int {
+        return log.append(entry)
     }
 
     private fun validateLog(requestVote: RequestVote): Boolean {

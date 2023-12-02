@@ -20,6 +20,10 @@ class Log {
 
     fun isNotEmpty(): Boolean = _entries.isNotEmpty()
 
+    fun lastStartsAt(index: Int): List<LogEntry> {
+        return _entries.filterIndexed { idx, _ -> idx >= index }
+    }
+
     fun append(entry: LogEntry): Int {
         _entries.add(entry)
         return _entries.size - 1

@@ -16,4 +16,8 @@ data class LogEntry(
     override fun hashCode(): Int {
         return Objects.hash(command, term)
     }
+
+    override fun toString(): String {
+        return "(cmd: $command, term: $term)"
+    }
 }
