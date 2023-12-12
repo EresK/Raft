@@ -3,11 +3,12 @@ package ogr.raftv3
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import com.fasterxml.jackson.module.kotlin.readValue
 import kotlinx.coroutines.*
+import ogr.raftv3.command.Command
+import ogr.raftv3.log.LogEntry
 import ogr.rpc.*
 import ogr.transport.Node
 import ogr.transport.TcpConnection
 import ogr.transport.TcpLooper
-import ogr.util.LogEntry
 import ogr.util.MessageEntry
 import ogr.util.MessageQueue
 import ogr.util.MessageWriter
@@ -51,6 +52,17 @@ class RaftNode(val self: Node, val others: List<Node>) {
         private const val RAFT_LOOP_DELAY = 0L // 30L
     }
 
+    fun isLeader(): Boolean = state.isLeader()
+
+    fun state(): Pair<List<LogEntry>, Int> {
+        println("Commit index: ${state.log.commitIndex}") // <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+
+        val commitIndex = state.log.commitIndex
+        val entries = state.log.entries.take(commitIndex + 1)
+
+        return Pair(entries, commitIndex)
+    }
+
     suspend fun start() {
         println("Majority: $majority") // <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 
@@ -67,23 +79,22 @@ class RaftNode(val self: Node, val others: List<Node>) {
         raftServerScope.cancel()
     }
 
-    suspend fun appendCommand(command: Int): Boolean {
-        val index = state.applyCommand(LogEntry(command, state.currentTerm))
+    /* State Machine functions */
+    suspend fun appendCommand(command: Command): Boolean {
+        val index = state.appendEntry(LogEntry(command, state.currentTerm))
 
         while (index > state.log.commitIndex) {
-            delay(100L)
+            if (state.isLeader())
+                delay(100L)
+            else
+                return false
         }
 
         return true
     }
 
-    fun isLeader(): Boolean = state.isLeader()
-
-    fun state(): List<LogEntry> {
-        println("Commit index: ${state.log.commitIndex}") // <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
-
-        return state.log.entries.take(state.log.commitIndex + 1)
-//        return state.log.entries
+    suspend fun getMachineState(): Map<String, String> {
+        return state.keyValueMachine.state()
     }
 
     private suspend fun raftLoop() {
@@ -144,6 +155,7 @@ class RaftNode(val self: Node, val others: List<Node>) {
 
                 else -> {}
             }
+            state.applyCommand()
 
             delay(FOLLOWER_LOOP_DELAY)
         }
@@ -242,6 +254,7 @@ class RaftNode(val self: Node, val others: List<Node>) {
 
                 else -> {}
             }
+            state.applyCommand()
 
             delay(CANDIDATE_LOOP_DELAY)
         }
@@ -360,6 +373,7 @@ class RaftNode(val self: Node, val others: List<Node>) {
 
                 else -> {}
             }
+            state.applyCommand()
 
             delay(LEADER_LOOP_DELAY)
         }

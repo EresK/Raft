@@ -10,6 +10,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import ogr.raftv3.RaftNode
+import ogr.raftv3.command.Command
+import ogr.raftv3.command.CommandType
 import ogr.transport.Node
 
 fun main(): Unit = runBlocking {
@@ -26,24 +28,36 @@ fun main(): Unit = runBlocking {
 
     embeddedServer(Netty, port = 8081) {
         routing {
-            post("/{command}") {
-                val command = call.parameters["command"]!!
-                val commandNumber = command.toIntOrNull() ?: 0
+            post("/{type}") {
+                val type = call.parameters["type"]!!.let { CommandType.fromString(it) }
+                val key = call.request.queryParameters["key"]!!
+                val value = call.request.queryParameters["value"]!!
+
+                println("$type $key : $value") // <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 
                 if (node.isLeader()) {
-                    val result = node.appendCommand(commandNumber)
+                    val result = node.appendCommand(Command(type, key, value))
                     call.respondText("Result: $result")
                 }
-                else call.respondText("Follower")
+                else call.respondText("Not Leader")
             }
-            get {
-                val entries = node.state()
-                val entriesResult = entries.joinToString(prefix = "[", postfix = "]")
+            get("/machine") {
+                val machineState = node.getMachineState()
+                val result = machineState.toList().joinToString(prefix = "{", postfix = "}")
 
                 if (node.isLeader())
-                    call.respondText("Result: $entriesResult")
+                    call.respondText("Result: $result")
                 else
-                    call.respondText("Follower: $entriesResult")
+                    call.respondText("Not Leader: $result")
+            }
+            get("/node") {
+                val (entries, commitIndex) = node.state()
+                val entriesResult = entries.joinToString(prefix = "{", postfix = "}")
+
+                if (node.isLeader())
+                    call.respondText("Commit index: $commitIndex\nResult: $entriesResult")
+                else
+                    call.respondText("Commit index: $commitIndex\nNot Leader: $entriesResult")
             }
         }
     }.start(true)

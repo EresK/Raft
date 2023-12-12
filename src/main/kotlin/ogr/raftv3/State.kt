@@ -1,12 +1,13 @@
 package ogr.raftv3
 
 import ogr.raftv3.log.Log
+import ogr.raftv3.log.LogEntry
+import ogr.raftv3.machine.KeyValueMachine
 import ogr.rpc.AppendEntries
 import ogr.rpc.AppendEntriesResponse
 import ogr.rpc.RequestVote
 import ogr.rpc.RequestVoteResponse
 import ogr.transport.Node
-import ogr.util.LogEntry
 import java.util.concurrent.atomic.AtomicInteger
 
 class State(val self: Node) {
@@ -17,13 +18,13 @@ class State(val self: Node) {
     var leaderId: Int? = null
         private set
     val grantedVotes: AtomicInteger = AtomicInteger(0)
+    val keyValueMachine = KeyValueMachine()
 
     // Persistent state
     @Volatile
     var currentTerm = 0
         private set
-    var votedFor: Int? = null
-        private set
+    private var votedFor: Int? = null
     val log: Log = Log()
 
     fun isLeader(): Boolean {
@@ -125,8 +126,15 @@ class State(val self: Node) {
         return RequestVoteResponse(currentTerm, grantVote)
     }
 
-    fun applyCommand(entry: LogEntry): Int {
+    fun appendEntry(entry: LogEntry): Int {
         return log.append(entry)
+    }
+
+    suspend fun applyCommand() {
+        if (log.apply()) {
+            val entry = log[log.lastApplied]!!
+            keyValueMachine.apply(entry.command)
+        }
     }
 
     private fun validateLog(requestVote: RequestVote): Boolean {

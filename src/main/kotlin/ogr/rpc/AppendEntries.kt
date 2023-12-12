@@ -1,6 +1,6 @@
 package ogr.rpc
 
-import ogr.util.LogEntry
+import ogr.raftv3.log.LogEntry
 
 data class AppendEntries(
     val term: Int, // leader's term

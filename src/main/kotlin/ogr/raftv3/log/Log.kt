@@ -1,6 +1,5 @@
 package ogr.raftv3.log
 
-import ogr.util.LogEntry
 import kotlin.math.min
 
 class Log {
@@ -27,6 +26,15 @@ class Log {
     fun append(entry: LogEntry): Int {
         _entries.add(entry)
         return _entries.size - 1
+    }
+
+    fun apply(): Boolean {
+        val possible = commitIndex > lastApplied
+
+        if (possible)
+            lastApplied += 1
+
+        return possible
     }
 
     fun commit(index: Int): Boolean {

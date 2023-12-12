@@ -1,9 +1,10 @@
-package ogr.util
+package ogr.raftv3.log
 
+import ogr.raftv3.command.Command
 import java.util.*
 
 data class LogEntry(
-    val command: Int,
+    val command: Command,
     val term: Int
 ) {
     override fun equals(other: Any?): Boolean {
@@ -18,6 +19,6 @@ data class LogEntry(
     }
 
     override fun toString(): String {
-        return "(cmd: $command, term: $term)"
+        return "($command, term: $term)"
     }
 }
